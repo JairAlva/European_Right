@@ -1,0 +1,9 @@
+---
+title: "Data_creator"
+author: "Jair Alva Mendoza"
+date: "28/4/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
