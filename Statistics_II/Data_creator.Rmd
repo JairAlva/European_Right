@@ -7,3 +7,75 @@ editor_options:
   chunk_output_type: console
 ---
 
+This RMD is only for CLEANING data. For analysis and graphs use another one. 
+
+### Labraries
+```{r}
+library(rio)
+library(readxl)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(ggridges)
+```
+
+# Manifesto Project
+```{r}
+man <- read_csv("Data/MPDataset_MPDS2021a.csv")
+```
+
+I will create a data set that contains the average of labour references for left-wing and right-wing parties in all country-year.
+
+### Cleaning
+```{r}
+man_lab = man |> 
+  mutate(edate = dmy(edate), ideo = rescale(rile, to = c(0,10)), 
+         ideo_ord = case_when(ideo < 3 ~ "lab_ei", ideo < 5 ~ "lab_i",
+                              ideo < 6 ~ "lab_c", ideo < 8 ~ "lab_d", 
+                              ideo <= 10 ~ "lab_ed", TRUE ~ "lab_c"), 
+         year = year(edate)) |> 
+  select(year, countryname, per701, ideo_ord) |>
+  filter(!is.na(per701)) |> 
+  group_by(year, countryname, ideo_ord) |>
+  summarise(lab_ref = mean(per701)) |> 
+  ungroup() |> 
+  pivot_wider(names_from = ideo_ord, values_from = lab_ref) |> 
+  arrange(countryname, year) |> 
+  mutate_at(vars(lab_c:lab_ed), ~replace_na(.,0)) |> 
+  rename(country_name = countryname)
+```
+
+# Electoral results
+```{r}
+elect <- read_xlsx("Data/parlgov.xlsx", sheet="election")
+```
+
+### Cleaning
+```{r}
+elect_vot = elect |> 
+  mutate(edate = ymd(election_date), year = year(election_date),
+         ideo_ord = case_when(left_right < 3 ~ "vot_ei", left_right < 5 ~ "vot_i",
+                              left_right < 6 ~ "vot_c", left_right < 8 ~ "vot_d",
+                              left_right <= 10 ~ "vot_ed", TRUE ~ "vot_c")) |> 
+  filter(#election_type=="ep" & 
+           !is.na(vote_share)) |> #delete if vote_share is na or replace with 0?
+  select(year, country_name, vote_share, ideo_ord) |>
+  group_by(year, country_name, ideo_ord) |> 
+  summarise(votes = mean(vote_share)) |> 
+  ungroup() |> 
+  pivot_wider(names_from = ideo_ord, values_from = votes) |> 
+  mutate_at(vars(vot_c:vot_ed), ~replace_na(.,0)) |> 
+  arrange(country_name, year)
+```
+
+# Join
+```{r}
+data = elect_vot |> 
+  left_join(man_lab)
+```
+
+### Save 
+```{r}
+#save(data, file = "data.RDta")
+```
+
