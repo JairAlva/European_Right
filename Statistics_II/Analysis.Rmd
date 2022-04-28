@@ -1,0 +1,19 @@
+---
+title: "Analysis"
+author: "Jair Alva Mendoza"
+date: "28/4/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+load("data.RDta")
+```
+
+# Linear regression
+```{r}
+mod1 = lm(vot_d  ~ lab_d, data = data)
+summary(mod1)
+```
+
