@@ -28,20 +28,29 @@ I will create a data set that contains the average of labour references for left
 
 ### Cleaning
 ```{r}
+man_ideo_cont = man |> 
+  mutate(edate = dmy(edate), year = year(edate)) |> 
+  select(year, countryname, rile) |> 
+  filter(!is.na(rile)) |>
+  group_by(year, countryname) |> 
+  summarise(nat_ideo = mean(rile), sd_nat_ideo = sd(rile))
+
 man_lab = man |> 
-  mutate(edate = dmy(edate), ideo = rescale(rile, to = c(0,10)), 
-         ideo_ord = case_when(ideo < 3 ~ "lab_ei", ideo < 5 ~ "lab_i",
-                              ideo < 6 ~ "lab_c", ideo < 8 ~ "lab_d", 
-                              ideo <= 10 ~ "lab_ed", TRUE ~ "lab_c"), 
-         year = year(edate)) |> 
-  select(year, countryname, per701, ideo_ord) |>
+  mutate(edate = dmy(edate), year = year(edate)) |> 
+  select(year, countryname, partyname, per701, rile) |>
   filter(!is.na(per701)) |> 
+  left_join(man_ideo_cont) |> 
+  mutate(party_ideo = rile - nat_ideo, 
+         ideo_ord = case_when(party_ideo < (-1)*sd_nat_ideo ~ "lab_ei", 
+                              party_ideo <= 0 ~ "lab_ci", 
+                              party_ideo > sd_nat_ideo ~ "lab_ed",
+                              party_ideo > 0 ~ "lab_cd")) |> 
   group_by(year, countryname, ideo_ord) |>
   summarise(lab_ref = mean(per701)) |> 
   ungroup() |> 
   pivot_wider(names_from = ideo_ord, values_from = lab_ref) |> 
   arrange(countryname, year) |> 
-  mutate_at(vars(lab_c:lab_ed), ~replace_na(.,0)) |> 
+  mutate_at(vars(lab_cd:lab_ed), ~replace_na(.,0)) |> 
   rename(country_name = countryname)
 ```
 
@@ -52,26 +61,41 @@ elect <- read_xlsx("Data/parlgov.xlsx", sheet="election")
 
 ### Cleaning
 ```{r}
+elect_ideo_cont = elect |> 
+  mutate(edate = ymd(election_date), year = year(edate)) |> 
+  select(year, country_name, left_right) |> 
+  filter(!is.na(left_right)) |>
+  group_by(year, country_name) |> 
+  summarise(nat_ideo = mean(left_right), sd_nat_ideo = sd(left_right))
+
 elect_vot = elect |> 
-  mutate(edate = ymd(election_date), year = year(election_date),
-         ideo_ord = case_when(left_right < 3 ~ "vot_ei", left_right < 5 ~ "vot_i",
-                              left_right < 6 ~ "vot_c", left_right < 8 ~ "vot_d",
-                              left_right <= 10 ~ "vot_ed", TRUE ~ "vot_c")) |> 
-  filter(#election_type=="ep" & 
-           !is.na(vote_share)) |> #delete if vote_share is na or replace with 0?
+  mutate(edate = ymd(election_date), year = year(edate)) |> 
+  select(year, country_name, party_name_english, left_right, vote_share) |> 
+  left_join(elect_ideo_cont) |> 
+  mutate(party_ideo = left_right - nat_ideo,
+         ideo_ord = case_when(party_ideo < (-1)*sd_nat_ideo ~ "vot_ei", 
+                              party_ideo <= 0 ~ "vot_ci", 
+                              party_ideo > sd_nat_ideo ~ "vot_ed",
+                              party_ideo > 0 ~ "vot_cd")) |>
+  filter(!is.na(vote_share) & !is.na(left_right)) |>
   select(year, country_name, vote_share, ideo_ord) |>
   group_by(year, country_name, ideo_ord) |> 
   summarise(votes = mean(vote_share)) |> 
   ungroup() |> 
   pivot_wider(names_from = ideo_ord, values_from = votes) |> 
-  mutate_at(vars(vot_c:vot_ed), ~replace_na(.,0)) |> 
+  mutate_at(vars(vot_cd:vot_ed), ~replace_na(.,0)) |> 
   arrange(country_name, year)
 ```
 
 # Join
 ```{r}
 data = elect_vot |> 
-  left_join(man_lab)
+  left_join(man_lab) |> 
+  drop_na() |> 
+  arrange(country_name , year) |> 
+  group_by(country_name) |> 
+  mutate(var_lab_ed = lab_ed - lag(lab_ed), var_lab_ei = lab_ei - lag(lab_ei)) |> 
+  drop_na()
 ```
 
 ### Save 

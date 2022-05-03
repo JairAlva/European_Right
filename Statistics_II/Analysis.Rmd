@@ -13,7 +13,7 @@ load("data.RDta")
 
 # Linear regression
 ```{r}
-mod1 = lm(vot_d  ~ lab_d, data = data)
+mod1 = lm(vot_ed  ~ lab_ed + lab_ei, data = data)
 summary(mod1)
 ```
 
