@@ -7,13 +7,47 @@ editor_options:
   chunk_output_type: console
 ---
 
+###Libraries
+```{r}
+library(plm)
+```
+
 ```{r}
 load("data.RDta")
 ```
 
-# Linear regression
+## Linear regression
 ```{r}
-mod1 = lm(vot_ed  ~ lab_ed + lab_ei, data = data)
+mod1 = lm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
+            prev_pol_pol +prev_pol_viol, data = data)
 summary(mod1)
+```
+
+## Panel data
+```{r}
+#Estimating LSDV
+
+LSDV <-lm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
+            prev_pol_pol + prev_pol_viol + factor(country_name), data= data)
+summary(LSDV)
+
+# Fixed effects
+fixed <- plm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
+            prev_pol_pol +prev_pol_viol, data= data, 
+             index=c("country_name", "year"), model="within")
+summary(fixed)
+
+fixef(fixed)
+
+pFtest(fixed, mod1) # Testing for fixed effects, null: POOLED better than fixed
+
+# Random effects
+random <- plm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
+            prev_pol_pol + prev_pol_viol, data= data, 
+             index=c("country_name", "year"), model="random")
+summary(random)
+
+#choosing between fixed or random the Hausman test
+phtest(fixed, random) # null: RANDOM better than fixed 
 ```
 

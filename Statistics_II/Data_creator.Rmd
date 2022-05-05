@@ -33,18 +33,21 @@ man_ideo_cont = man |>
   select(year, countryname, rile) |> 
   filter(!is.na(rile)) |>
   group_by(year, countryname) |> 
-  summarise(nat_ideo = mean(rile), sd_nat_ideo = sd(rile))
+  mutate(rile_2 = rescale(rile, to = c(0,10))) |> 
+  summarise(nat_ideo = mean(rile_2), sd_nat_ideo = sd(rile_2))
 
 man_lab = man |> 
   mutate(edate = dmy(edate), year = year(edate)) |> 
-  select(year, countryname, partyname, per701, rile) |>
+  select(year, countryname, partyname, per701, rile, parfam) |>
+  group_by(year, countryname) |> 
+  mutate(rile_2 = rescale(rile, to = c(0,10))) |> 
   filter(!is.na(per701)) |> 
   left_join(man_ideo_cont) |> 
-  mutate(party_ideo = rile - nat_ideo, 
+  mutate(party_ideo = rile_2 - nat_ideo, 
          ideo_ord = case_when(party_ideo < (-1)*sd_nat_ideo ~ "lab_ei", 
                               party_ideo <= 0 ~ "lab_ci", 
                               party_ideo > sd_nat_ideo ~ "lab_ed",
-                              party_ideo > 0 ~ "lab_cd")) |> 
+                              party_ideo > 0 ~ "lab_cd")) |>
   group_by(year, countryname, ideo_ord) |>
   summarise(lab_ref = mean(per701)) |> 
   ungroup() |> 
@@ -61,25 +64,17 @@ elect <- read_xlsx("Data/parlgov.xlsx", sheet="election")
 
 ### Cleaning
 ```{r}
-elect_ideo_cont = elect |> 
-  mutate(edate = ymd(election_date), year = year(edate)) |> 
-  select(year, country_name, left_right) |> 
-  filter(!is.na(left_right)) |>
-  group_by(year, country_name) |> 
-  summarise(nat_ideo = mean(left_right), sd_nat_ideo = sd(left_right))
-
 elect_vot = elect |> 
   mutate(edate = ymd(election_date), year = year(edate)) |> 
-  select(year, country_name, party_name_english, left_right, vote_share) |> 
-  left_join(elect_ideo_cont) |> 
-  mutate(party_ideo = left_right - nat_ideo,
-         ideo_ord = case_when(party_ideo < (-1)*sd_nat_ideo ~ "vot_ei", 
-                              party_ideo <= 0 ~ "vot_ci", 
-                              party_ideo > sd_nat_ideo ~ "vot_ed",
-                              party_ideo > 0 ~ "vot_cd")) |>
+  select(year, country_name_short, country_name, party_name_english, left_right,
+         vote_share) |> 
+  mutate(ideo_ord = case_when(left_right < 3 ~ "vot_ei", 
+                              left_right <= 5 ~ "vot_ci", 
+                              left_right < 8 ~ "vot_cd",
+                              left_right <= 10 ~ "vot_ed")) |> 
   filter(!is.na(vote_share) & !is.na(left_right)) |>
-  select(year, country_name, vote_share, ideo_ord) |>
-  group_by(year, country_name, ideo_ord) |> 
+  select(year, country_name_short, country_name, vote_share, ideo_ord) |>
+  group_by(year, country_name, country_name_short, ideo_ord) |> 
   summarise(votes = mean(vote_share)) |> 
   ungroup() |> 
   pivot_wider(names_from = ideo_ord, values_from = votes) |> 
@@ -87,19 +82,74 @@ elect_vot = elect |>
   arrange(country_name, year)
 ```
 
+# Left-wing cabinet
+```{r}
+cab <- read_xlsx("Data/parlgov.xlsx", sheet="cabinet")
+```
+
+### Cleaning
+```{r}
+left_cabin = cab |> 
+  mutate(edate = ymd(election_date), year = year(edate), 
+         start_date = ymd(start_date)) |> 
+  filter(prime_minister == 1) |> 
+  select(year, country_name, start_date, left_right) |> 
+  group_by(year, country_name) |> 
+  filter(start_date == min(start_date)) |> 
+  left_join(elect_ideo_cont) |> 
+  mutate(party_ideo = left_right - nat_ideo,
+         left_cabin = case_when(left_right <= 5 ~ 1, left_right > 5 ~ 0)) |>
+  select(year, country_name, start_date, left_cabin) |> 
+  drop_na()
+```
+
+# Add other variables
+```{r}
+#V-Dem
+vdem = import("C:/Users/almen/Desktop/Data/V-DEM/Country_Year_V-Dem_Full+others_STATA_v11.1/V-Dem-CY-Full+Others-v11.1.dta")
+
+vdem_sub = vdem |> 
+  select(year, country_name, country_text_id, e_migdppcln, v2cacamps_mean,
+         v2caviol_mean, v2peapsgeo_mean, e_miurbpop, e_peaveduc) |> 
+  rename(country_name_short = country_text_id, gdp_per = e_migdppcln,
+         pol_pol = v2cacamps_mean, pol_viol = v2caviol_mean, urb_pop = e_miurbpop,
+         avr_educ = e_peaveduc)
+
+# Deaths rate
+deaths = import("https://raw.githubusercontent.com/owid/owid-datasets/master/datasets/Mortality%20from%20all%20forms%20of%20violence%20%20(IHME%20(2016))/Mortality%20from%20all%20forms%20of%20violence%20%20(IHME%20(2016)).csv")
+
+deaths = deaths |> 
+  rename(country_name = Entity, year = Year, age_stand_death = 
+           `Age-standardized death rate from all forms of violence (IHME (2016))`,
+         total_death = `Total deaths from all forms of violence (IHME (2016))`,
+         total_death_rate = `Death rate from all forms of violence (IHME (2016))`)
+
+# Migration
+migr = import("data/migration_oecd.csv")
+
+migr = migr |> 
+  select(LOCATION, TIME, Value) |> 
+  rename(country_name_short = LOCATION, year = TIME, per_foreign_pop = Value)
+```
+
 # Join
 ```{r}
 data = elect_vot |> 
   left_join(man_lab) |> 
+  left_join(left_cabin) |>
   drop_na() |> 
   arrange(country_name , year) |> 
+  mutate(lab_i = lab_ci + lab_ei, lab_d = lab_cd + lab_ed,
+         var_lab_d = lab_d - lag(lab_d), var_lab_i = lab_i - lag(lab_i),
+         var_lab_ed = lab_ed - lag(lab_ed), var_lab_ei = lab_ei - lag(lab_ei),
+         prev_left_cab = lag(left_cabin)) |> 
+  left_join(vdem_sub) |>
   group_by(country_name) |> 
-  mutate(var_lab_ed = lab_ed - lag(lab_ed), var_lab_ei = lab_ei - lag(lab_ei)) |> 
-  drop_na()
+  left_join(deaths) |> 
+  left_join(migr)
 ```
-
 ### Save 
 ```{r}
-#save(data, file = "data.RDta")
+save(data, file = "data.RDta")
 ```
 
