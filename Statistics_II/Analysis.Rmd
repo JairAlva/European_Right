@@ -9,17 +9,32 @@ editor_options:
 
 ###Libraries
 ```{r}
+library(tidyverse)
 library(plm)
+library(stargazer)
+library(performance)
 ```
 
 ```{r}
 load("data.RDta")
 ```
+## Descreptive
+```{r}
+# Relation of labor mentions between right and left
+data |> 
+  arrange(year) |> 
+  select(year, lab_left, lab_right) |> 
+  group_by(year) |> 
+  summarise_all(mean) |> 
+  ggplot() +
+  geom_line(aes(x = year, y = lab_left), color ="blue", show.legend = T) + 
+  geom_line(aes(x = year, y = lab_right)) +
+  theme_classic()
+```
 
 ## Linear regression
 ```{r}
-mod1 = lm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
-            prev_pol_pol +prev_pol_viol, data = data)
+mod1 = lm(vot_ed  ~ lab_left*prev_left_cab, data = data)
 summary(mod1)
 ```
 
@@ -27,13 +42,11 @@ summary(mod1)
 ```{r}
 #Estimating LSDV
 
-LSDV <-lm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
-            prev_pol_pol + prev_pol_viol + factor(country_name), data= data)
+LSDV <-lm(vot_ed  ~ lab_left*prev_left_cab + factor(country_name), data= data)
 summary(LSDV)
 
 # Fixed effects
-fixed <- plm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
-            prev_pol_pol +prev_pol_viol, data= data, 
+fixed <- plm(vot_ed  ~ lab_left*prev_left_cab, data= data, 
              index=c("country_name", "year"), model="within")
 summary(fixed)
 
@@ -42,12 +55,43 @@ fixef(fixed)
 pFtest(fixed, mod1) # Testing for fixed effects, null: POOLED better than fixed
 
 # Random effects
-random <- plm(vot_ed  ~ lab_d + lab_i + factor(prev_left_cab) + prev_gdp +
-            prev_pol_pol + prev_pol_viol, data= data, 
+random <- plm(vot_ed  ~ lab_left*prev_left_cab, data= data, 
              index=c("country_name", "year"), model="random")
 summary(random)
 
 #choosing between fixed or random the Hausman test
 phtest(fixed, random) # null: RANDOM better than fixed 
+```
+
+### Summary
+```{r}
+stargazer(mod1, fixed, random,  
+          title="Panel regressions, clustered SEs", type="text", 
+          column.labels=c("Pooled OLS", "Fixed Effects", "Random Effects"), 
+          df=FALSE, digits=4, out = "dif_models.html")
+```
+
+### With control variables
+```{r}
+random2 <- plm(vot_ed  ~ lab_left*prev_left_cab + 
+                 per_foreign_pop + var_gdp, data= data, 
+             index=c("country_name", "year"), model="random")
+
+random3 <- plm(vot_ed  ~ lab_left*prev_left_cab + pol_viol + age_stand_death, 
+               data= data, 
+             index=c("country_name", "year"), model="random")
+
+random4 <- plm(vot_ed  ~ lab_left*prev_left_cab + avr_educ + urb_pop, 
+               data= data, 
+             index=c("country_name", "year"), model="random")
+
+random5 <- plm(vot_ed  ~ lab_left*prev_left_cab + pol_pol, 
+               data= data, 
+             index=c("country_name", "year"), model="random")
+
+stargazer(random, random2, random3, random4, random5,
+          title="Random Effect Regressions", type="text", 
+          df=FALSE, digits=4, out = "mod_controls.html")
+
 ```
 
