@@ -100,7 +100,7 @@ random6 <- plm(vot_ed  ~ lab_left*prev_left_cab + per_foreign_pop + var_gdp +
                data= data, 
              index=c("country_name", "year"), model="random")
 
-stargazer(random, random2, random3, random4, random5,
+stargazer(random, random2, random3, random4, random5, random6,
           title="Table 2. Random Effect Regressions", type="text", 
           covariate.labels = c("laboral mentions", "Prev Cab Left",
                                "% Foreigners", "Var GDP", "Political Violence",
@@ -109,7 +109,7 @@ stargazer(random, random2, random3, random4, random5,
                                "laboral mentions:Prev Cab Left",
                                "Constant"),
           dep.var.labels = c("Vote share PRR parties"),
-          df=FALSE, digits=4, out = "table2.html")
+          df=FALSE, digits=4, out = "table2_1.tex")
 
 ```
 
