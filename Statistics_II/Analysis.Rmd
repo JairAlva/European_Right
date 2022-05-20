@@ -13,6 +13,13 @@ library(tidyverse)
 library(plm)
 library(stargazer)
 library(performance)
+library(xtable)
+# corplot
+library(psych)
+library(polycor)
+library(ggcorrplot)
+library(PerformanceAnalytics)
+library(corrplot)
 ```
 
 ```{r}
@@ -32,6 +39,55 @@ data |>
   theme_classic()
 ```
 
+  + Correlation matrix
+```{r}
+matrixcor <- cor(data[,c(8, 22, 26, 15, 19, 18, 16, 14)], 
+                 use = "pairwise.complete.obs")
+cor.plot(matrixcor)
+```
+  
+  + Descriptive table
+```{r}
+min = data |> 
+  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+         age_stand_death, avr_educ, pub_serv_rural, pol_pol)  |> 
+  summarise_all(min, na.rm = T) |> 
+  pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Min")
+
+max = data |> 
+  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+         age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
+  summarise_all(max, na.rm = T) |> 
+  pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Max") 
+  
+
+mean = data |> 
+  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+         age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
+  summarise_all(mean, na.rm = T) |> 
+  pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Mean")
+ 
+median = data |> 
+  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+         age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
+  summarise_all(median, na.rm = T) |> 
+  pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Median")
+
+sd = data |> 
+  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+         age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
+  summarise_all(sd, na.rm = T) |> 
+  pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "SD")
+
+descriptives = min |> 
+  left_join(max) |> 
+  left_join(mean) |> 
+  left_join(median) |> 
+  left_join(sd)
+
+print(xtable(descriptives, type = "latex"), file = "table0.tex")
+```
+  
 ## Linear regression
 ```{r}
 mod1 = lm(vot_ed  ~ lab_left*prev_left_cab, data = data)
@@ -87,7 +143,7 @@ random3 <- plm(vot_ed  ~ lab_left*prev_left_cab + pol_viol + age_stand_death,
                data= data, 
              index=c("country_name", "year"), model="random")
 
-random4 <- plm(vot_ed  ~ lab_left*prev_left_cab + avr_educ + urb_pop, 
+random4 <- plm(vot_ed  ~ lab_left*prev_left_cab + avr_educ + pub_serv_rural, 
                data= data, 
              index=c("country_name", "year"), model="random")
 
@@ -96,7 +152,7 @@ random5 <- plm(vot_ed  ~ lab_left*prev_left_cab + pol_pol,
              index=c("country_name", "year"), model="random")
 
 random6 <- plm(vot_ed  ~ lab_left*prev_left_cab + per_foreign_pop + var_gdp +
-                 pol_viol + age_stand_death + avr_educ + urb_pop + pol_pol, 
+                 pol_viol + age_stand_death + avr_educ + pub_serv_rural + pol_pol, 
                data= data, 
              index=c("country_name", "year"), model="random")
 
@@ -109,7 +165,10 @@ stargazer(random, random2, random3, random4, random5, random6,
                                "laboral mentions:Prev Cab Left",
                                "Constant"),
           dep.var.labels = c("Vote share PRR parties"),
-          df=FALSE, digits=4, out = "table2_1.tex")
+          df=FALSE, digits=4, out = "table2_2.html")
 
+r2(random4)
+
+check_collinearity(random4)
 ```
 

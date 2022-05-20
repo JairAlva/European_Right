@@ -74,7 +74,7 @@ elect_vot = elect |>
   mutate(ideo_ord = case_when(left_right < 3 ~ "vot_ei", 
                               left_right <= 5 ~ "vot_ci", 
                               left_right < 8 ~ "vot_cd",
-                              left_right <= 10 ~ "vot_ed")) |> view()
+                              left_right <= 10 ~ "vot_ed")) |>
   filter(!is.na(vote_share) & !is.na(left_right)) |>
   select(year, country_name_short, country_name, vote_share, ideo_ord) |>
   group_by(year, country_name, country_name_short, ideo_ord) |> 
@@ -99,11 +99,11 @@ left_cabin = cab |>
   select(year, country_name, start_date, left_right) |> 
   group_by(year, country_name) |> 
   filter(start_date == min(start_date)) |> 
-  left_join(elect_ideo_cont) |> 
-  mutate(party_ideo = left_right - nat_ideo,
-         left_cabin = as.factor(case_when(left_right <= 5 ~ 1, 
-                                          left_right > 5 ~ 0))) |>
-  select(year, country_name, start_date, left_cabin) |> 
+  mutate(left_cabin = as.factor(case_when(left_right <= 5 ~ 1, 
+                                          left_right > 5 ~ 0)),
+         left_cabin_num = case_when(left_right <= 5 ~ 1, 
+                                          left_right > 5 ~ 0)) |>
+  select(year, country_name, start_date, left_cabin, left_cabin_num) |> 
   drop_na()
 ```
 
@@ -148,15 +148,19 @@ data = elect_vot |>
   left_join(deaths) |> 
   left_join(migr) |> 
   group_by(country_name) |> 
-  mutate(var_lab_right = lab_right - lag(lab_right), 
-         var_lab_left = lab_left - lag(lab_left),
-         prev_left_cab = lag(left_cabin), var_gdp = gdp_per - lag(gdp_per),
-         var_death = age_stand_death - lag(age_stand_death),
-         var_tot_death = total_death - lag(total_death)) |> 
+  mutate(var_lab_right = lab_right -  dplyr::lag(lab_right), 
+         var_lab_left = lab_left - dplyr::lag(lab_left),
+         prev_left_cab = dplyr::lag(left_cabin), 
+         var_gdp = gdp_per - dplyr::lag(gdp_per),
+         prev_left_cab_num = dplyr::lag(left_cabin_num),
+         var_death = age_stand_death - dplyr::lag(age_stand_death),
+         var_tot_death = total_death - dplyr::lag(total_death)) |> 
   ungroup()
 ```
 ### Save 
 ```{r}
 save(data, file = "data.RDta")
+
+write.csv(data, file = "data.csv")
 ```
 
