@@ -14,6 +14,7 @@ library(plm)
 library(stargazer)
 library(performance)
 library(xtable)
+library(broom)
 # corplot
 library(psych)
 library(polycor)
@@ -49,32 +50,32 @@ cor.plot(matrixcor)
   + Descriptive table
 ```{r}
 min = data |> 
-  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+  select(vot_ed, lab_left, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
          age_stand_death, avr_educ, pub_serv_rural, pol_pol)  |> 
   summarise_all(min, na.rm = T) |> 
   pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Min")
 
 max = data |> 
-  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+  select(vot_ed, lab_left, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
          age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
   summarise_all(max, na.rm = T) |> 
   pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Max") 
   
 
 mean = data |> 
-  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+  select(vot_ed, lab_left, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
          age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
   summarise_all(mean, na.rm = T) |> 
   pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Mean")
  
 median = data |> 
-  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+  select(vot_ed, lab_left, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
          age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
   summarise_all(median, na.rm = T) |> 
   pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "Median")
 
 sd = data |> 
-  select(vot_ed, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
+  select(vot_ed, lab_left, prev_left_cab_num, per_foreign_pop, var_gdp, pol_viol,
          age_stand_death, avr_educ, pub_serv_rural, pol_pol) |> 
   summarise_all(sd, na.rm = T) |> 
   pivot_longer(vot_ed:pol_pol, names_to = "variables", values_to = "SD")
@@ -110,7 +111,9 @@ fixef(fixed)
 
 pFtest(fixed, mod1) # Testing for fixed effects, null: POOLED better than fixed
 
-write.table(test1, file = "test1.html")
+test.1 =tidy(pFtest(fixed, mod1))
+
+print(xtable(test.1, type = "latex"), file = "test.1.tex")
 
 # Random effects
 random <- plm(vot_ed  ~ lab_left*prev_left_cab, data= data, 
@@ -119,6 +122,9 @@ summary(random)
 
 #choosing between fixed or random the Hausman test
 phtest(fixed, random) # null: RANDOM better than fixed 
+test.2 = tidy(phtest(fixed, random))
+
+print(xtable(test.2, type = "latex"), file = "test.2.tex")
 ```
 
 ### Summary
@@ -161,11 +167,12 @@ stargazer(random, random2, random3, random4, random5, random6,
           covariate.labels = c("laboral mentions", "Prev Cab Left",
                                "% Foreigners", "Var GDP", "Political Violence",
                                "Rate of violent deaths", "Average of Education",
-                               "Urban Population", "Political Polarization",
+                               "Public services in rural", 
+                               "Political Polarization",
                                "laboral mentions:Prev Cab Left",
                                "Constant"),
           dep.var.labels = c("Vote share PRR parties"),
-          df=FALSE, digits=4, out = "table2_2.html")
+          df=FALSE, digits=4, out = "table2_2.tex")
 
 r2(random4)
 
